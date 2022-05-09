@@ -62,7 +62,9 @@ export default class PopperComponent extends React.Component {
             <TabLoop enableTabLoop={enableTabLoop}>
               <div
                 {...{ ref, style }}
-                className={classes}
+                className={
+                  placement === "top-start" ? "top-open-calendar" : classes
+                }
                 data-placement={placement}
                 onKeyDown={popperOnKeyDown}
               >

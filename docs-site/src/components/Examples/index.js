@@ -427,7 +427,7 @@ export default class exampleComponents extends React.Component {
     return (
       <>
         <h1>Examples</h1>
-        <ul className="examples__navigation">
+        {/* <ul className="examples__navigation">
           {this.examples.map((example) => (
             <li
               className="examples__navigation-item"
@@ -451,7 +451,7 @@ export default class exampleComponents extends React.Component {
           {this.examples.map((example) => (
             <CodeExampleComponent key={example.title} example={example} />
           ))}
-        </div>
+        </div> */}
       </>
     );
   }

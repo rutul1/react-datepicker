@@ -117,6 +117,10 @@ export default class DatePicker extends React.Component {
       excludeScrollbar: true,
       customTimeInput: null,
       calendarStartDay: 0,
+      handleNativeError: () => {},
+      keepOpen: false,
+      dateLabel: "Date",
+      parentContainerPos: "bottom",
     };
   }
 
@@ -265,15 +269,21 @@ export default class DatePicker extends React.Component {
     enableTabLoop: PropTypes.bool,
     customTimeInput: PropTypes.element,
     weekAriaLabelPrefix: PropTypes.string,
+    mode: PropTypes.string,
+    keepOpen: PropTypes.bool,
+    dateLabel: PropTypes.string,
+    initialDateTime: PropTypes.instanceOf(Date),
   };
 
   constructor(props) {
     super(props);
     this.state = this.calcInitialState();
+    this.compactContainerRef = React.createRef();
   }
 
   componentDidMount() {
     window.addEventListener("scroll", this.onScroll, true);
+    document.addEventListener("click", this.handleClicks);
   }
 
   componentDidUpdate(prevProps, prevState) {
@@ -310,12 +320,49 @@ export default class DatePicker extends React.Component {
         this.props.onCalendarClose();
       }
     }
+
+    if (prevProps.keepOpen !== this.props.keepOpen) {
+      if (this.props.keepOpen) {
+        this.setState({
+          showCompactContainer: this.props.keepOpen,
+        });
+      } else {
+        // closing the modal, reset the date
+        const { initialDateTime } = this.props;
+        if (initialDateTime) this.props.onChange(initialDateTime);
+        this.setState({
+          open: this.props.keepOpen,
+          showCompactContainer: this.props.keepOpen,
+        });
+      }
+    }
   }
 
   componentWillUnmount() {
     this.clearPreventFocusTimeout();
     window.removeEventListener("scroll", this.onScroll, true);
+    window.removeEventListener("click", this.handleClicks);
   }
+
+  handleClicks = (e) => {
+    const { showCompactContainer } = this.state;
+    if (
+      e &&
+      e.target &&
+      this.compactContainerRef &&
+      this.compactContainerRef.current &&
+      !this.compactContainerRef.current.contains(e.target) &&
+      showCompactContainer &&
+      !e.target.classList.contains("react-datepicker__day") &&
+      !e.target.classList.contains("main-input-datefield") &&
+      !e.target.classList.contains("text-grey") &&
+      !e.target.classList.contains("time-selection-ul__list")
+    ) {
+      this.setState({ showCompactContainer: false, open: false });
+      const { initialDateTime } = this.props;
+      if (initialDateTime) this.props.onChange(initialDateTime);
+    }
+  };
 
   getPreSelection = () =>
     this.props.openToDate
@@ -350,6 +397,7 @@ export default class DatePicker extends React.Component {
       // used to focus day in inline version after month has changed, but not on
       // initial render
       shouldFocusDayInline: false,
+      showCompactContainer: false,
     };
   };
 
@@ -371,6 +419,12 @@ export default class DatePicker extends React.Component {
     }
 
     this.cancelFocusInput();
+  };
+
+  handleCompactContainer = (val) => {
+    this.setState({
+      showCompactContainer: true,
+    });
   };
 
   setOpen = (open, skipSetBlur = false) => {
@@ -448,6 +502,46 @@ export default class DatePicker extends React.Component {
     }
   };
 
+  isNumeric(input, keyCode) {
+    let isShift = false;
+    const seperator = "-";
+    if (keyCode == 16) {
+      isShift = true;
+    }
+    let val = input.value;
+    input.value =
+      // val.replace(/^(\d\d)(\d)$/g,'$1/$2').replace(/^(\d\d\/\d\d)(\d+)$/g,'$1/$2').replace(/[^\d\/]/g,'')
+      // val.replace(/^([\d]{4})([\d]{2})([\d]{2})$/,"$1/$2/$3")  // YYYY-MM-DD
+      val.replace(
+        /^([0-3][0-9])([0-3][0-9])((?:[0-9][0-9])?[0-9][0-9])$/,
+        "$1-$2-$3"
+      ); // DD-MM-YYYY
+    // val.replace(/^([a-z][a-z][a-z])([0-3][0-9])((?:[0-9][0-9])?[0-9][0-9])$/,'$1 $2,$3') // MMM DD,YYYY
+    // val.replace(/^([0-3][0-9])([a-z][a-z][a-z])((?:[0-9][0-9])?[0-9][0-9])$/,"$1 $2,$3") //DD MMM,YYYY
+    // ^([0-3][0-9])([0-3][0-9])((?:[0-9][0-9])?[0-9][0-9])$  // dd-mm-yyyy
+
+    //Allow only Numeric Keys.
+    // if (
+    //   ((keyCode >= 48 && keyCode <= 57) ||
+    //     keyCode == 8 ||
+    //     keyCode <= 37 ||
+    //     keyCode <= 39 ||
+    //     (keyCode >= 96 && keyCode <= 105)) &&
+    //   isShift == false
+    // ) {
+    //   if (
+    //     (input.value.length == 2 || input.value.length == 5) &&
+    //     keyCode != 8
+    //   ) {
+    //     input.value += seperator;
+    //   }
+
+    //   return true;
+    // } else {
+    //   return false;
+    // }
+  }
+
   handleChange = (...allArgs) => {
     let event = allArgs[0];
     if (this.props.onChangeRaw) {
@@ -471,6 +565,12 @@ export default class DatePicker extends React.Component {
     );
     if (date || !event.target.value) {
       this.setSelected(date, event, true);
+      setTimeout(() => this.setFocus());
+      // this.props.handleNativeError("");
+      if (!this.state.open)
+        this.setState({
+          open: true,
+        });
     }
   };
 
@@ -620,17 +720,154 @@ export default class DatePicker extends React.Component {
     this.setState({ inputValue: null });
   };
 
-  onInputClick = () => {
+  onInputClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    let clickedOnFirstInput = false;
+    if (
+      e &&
+      e.target &&
+      e.target.classList &&
+      e.target.classList.contains("main-input-datefield")
+    ) {
+      clickedOnFirstInput = true;
+    }
+    if (!this.state.showCompactContainer) {
+      if (
+        e &&
+        e.target &&
+        window.innerHeight - e.target.getBoundingClientRect().bottom < 165
+      ) {
+        this.setState({
+          parentContainerPos: "top",
+        });
+      } else {
+        this.setState({
+          parentContainerPos: "bottom",
+        });
+      }
+    }
+
+    if (this.state.showCompactContainer) {
+      const elem = document.getElementsByClassName("compact-container-parent");
+      let bottomHeightAvailable = true;
+      if (elem && elem[0]) {
+        if (window.innerHeight - elem[0].getBoundingClientRect().bottom < 200)
+          bottomHeightAvailable = false;
+      }
+      if (!bottomHeightAvailable) elem[0].classList.add("top-open-callayout");
+      else elem[0].classList.remove("top-open-callayout");
+    }
+
+    const { mode, customInput, id } = this.props;
     if (!this.props.disabled && !this.props.readOnly) {
-      this.setOpen(true);
+      if (clickedOnFirstInput && this.state.showCompactContainer) return;
+      mode === "compact" && !this.state.showCompactContainer
+        ? (this.handleCompactContainer(true), //opens secondary popup
+          customInput &&
+            customInput.props &&
+            customInput.props.onClick &&
+            customInput.props.onClick(e))
+        : this.setOpen(true);
     }
 
     this.props.onInputClick();
   };
 
+  handleAutoDateFormatting = (input, keyCode, e) => {
+    const allDateFormats = [
+      "MMM DD, YYYY",
+      "DD-MMM-YYYY",
+      "YYYY-MM-DD",
+      "DD-MM-YYYY",
+      "MM-DD-YYYY",
+    ];
+
+    const calendarViewFormats = ["MMM DD", "MMMM YYYY"];
+
+    let isShift = false;
+    const seperator = "-";
+    if (keyCode == 16) {
+      isShift = true;
+    }
+
+    const receivedDateFormat = this.props.dateFormat.toUpperCase();
+    // 'MMM DD, YYYY'
+    // "YYYY-MM-DD";
+    const stringAllowedDateFormats = allDateFormats
+      .slice(0, 2)
+      .includes(receivedDateFormat);
+
+    //  allow only neumeric
+    if (keyCode === "Backspace") return;
+
+    if (calendarViewFormats.includes(receivedDateFormat)) {
+      if (calendarViewFormats[1] === receivedDateFormat) {
+        // do nothing, user has to type full month name
+      }
+      if (
+        input.value.length === 3 &&
+        keyCode.trim().length &&
+        calendarViewFormats[0] === receivedDateFormat
+      )
+        input.value += " ";
+      return;
+    }
+
+    if (
+      !stringAllowedDateFormats &&
+      allDateFormats.includes(receivedDateFormat) &&
+      ((keyCode >= 48 && keyCode <= 57) ||
+        keyCode === 8 ||
+        keyCode <= 37 ||
+        keyCode <= 39 ||
+        (keyCode >= 96 && keyCode <= 105)) &&
+      !isShift
+    ) {
+      if (receivedDateFormat !== allDateFormats[2]) {
+        // DD-MM-YYYY
+        // MM-DD-YYYY
+        if (
+          (input.value.length === 2 || input.value.length === 5) &&
+          keyCode !== 8
+        ) {
+          input.value += seperator;
+        }
+      } else {
+        // YYYY-MM-DD
+        if (
+          (input.value.length === 4 || input.value.length === 7) &&
+          input.value.split("-").length !== 3
+        ) {
+          input.value += seperator;
+        }
+      }
+    }
+
+    if (stringAllowedDateFormats) {
+      // MMM DD,YYYY
+      if (receivedDateFormat === allDateFormats[0]) {
+        if (input.value.length === 3 && keyCode.trim().length) {
+          input.value += " ";
+        }
+        if (input.value.length === 6 && keyCode !== ",") {
+          input.value += ", ";
+        }
+      } else {
+        // DD-MMM-YYYY
+        if (input.value.length === 2 || input.value.length === 6) {
+          input.value += seperator;
+        }
+      }
+    }
+  };
+
   onInputKeyDown = (event) => {
     this.props.onKeyDown(event);
     const eventKey = event.key;
+
+    this.handleAutoDateFormatting(event.target, event.key, event);
 
     if (
       !this.state.open &&
@@ -815,12 +1052,25 @@ export default class DatePicker extends React.Component {
         event.target === document.body
       ) {
         this.setOpen(false);
+        this.setState({
+          showCompactContainer: false,
+        });
       }
     } else if (typeof this.props.closeOnScroll === "function") {
       if (this.props.closeOnScroll(event)) {
         this.setOpen(false);
+        this.setState({
+          showCompactContainer: false,
+        });
       }
     }
+  };
+
+  getMaxLengthForInput = (receivedDateFormat) => {
+    if (["MMM DD, YYYY", "DD-MMM-YYYY"].includes(receivedDateFormat)) return 12;
+    if (receivedDateFormat === "MMM DD") return 6;
+    if (receivedDateFormat === "MMMM YYYY") return 14;
+    return 10;
   };
 
   renderCalendar = () => {
@@ -930,7 +1180,7 @@ export default class DatePicker extends React.Component {
         customTimeInput={this.props.customTimeInput}
         setPreSelection={this.setPreSelection}
       >
-        {this.props.children}
+        {this.props.mode === "compact" ? null : this.props.children}
       </WrappedCalendar>
     );
   };
@@ -940,6 +1190,7 @@ export default class DatePicker extends React.Component {
       [outsideClickIgnoreClass]: this.state.open,
     });
 
+    const receivedDateFormat = this.props.dateFormat.toUpperCase();
     const customInput = this.props.customInput || <input type="text" />;
     const customInputRef = this.props.customInputRef || "ref";
     const inputValue =
@@ -965,7 +1216,63 @@ export default class DatePicker extends React.Component {
       onClick: this.onInputClick,
       onFocus: this.handleFocus,
       onKeyDown: this.onInputKeyDown,
-      id: this.props.id,
+      id: this.props.id || "main-dateinput",
+      maxlength: this.getMaxLengthForInput(receivedDateFormat),
+      name: this.props.name,
+      autoFocus: this.props.autoFocus,
+      placeholder: this.props.placeholderText,
+      disabled: this.props.disabled,
+      autoComplete: this.props.autoComplete,
+      className: classnames(
+        customInput.props.className,
+        className,
+        "main-input-datefield"
+      ),
+      title: this.props.title,
+      readOnly: this.props.readOnly,
+      required: this.props.required,
+      tabIndex: this.props.tabIndex,
+      "aria-describedby": this.props.ariaDescribedBy,
+      "aria-invalid": this.props.ariaInvalid,
+      "aria-labelledby": this.props.ariaLabelledBy,
+      "aria-required": this.props.ariaRequired,
+    });
+  };
+
+  renderDefaultDateInput = () => {
+    const className = classnames(this.props.className, {
+      [outsideClickIgnoreClass]: this.state.open,
+    });
+
+    const receivedDateFormat = this.props.dateFormat.toUpperCase();
+
+    const customInput = <input className="form-control" type="text" />;
+    const customInputRef = this.props.customInputRef || "ref";
+    const inputValue =
+      typeof this.props.value === "string"
+        ? this.props.value
+        : typeof this.state.inputValue === "string"
+        ? this.state.inputValue
+        : this.props.selectsRange
+        ? safeDateRangeFormat(
+            this.props.startDate,
+            this.props.endDate,
+            this.props
+          )
+        : safeDateFormat(this.props.selected, this.props);
+
+    return React.cloneElement(customInput, {
+      [customInputRef]: (input) => {
+        this.input = input;
+      },
+      value: inputValue,
+      onBlur: this.handleBlur,
+      onChange: this.handleChange,
+      onClick: this.onInputClick,
+      onFocus: this.handleFocus,
+      onKeyDown: this.onInputKeyDown,
+      maxlength: this.getMaxLengthForInput(receivedDateFormat),
+      id: this.props.id || "main-dateinput",
       name: this.props.name,
       autoFocus: this.props.autoFocus,
       placeholder: this.props.placeholderText,
@@ -1014,7 +1321,9 @@ export default class DatePicker extends React.Component {
 
   render() {
     const calendar = this.renderCalendar();
-
+    const { mode, children, dateLabel } = this.props;
+    const { parentContainerPos } = this.state;
+    const isCompact = mode && mode === "compact";
     if (this.props.inline && !this.props.withPortal) {
       return calendar;
     }
@@ -1034,6 +1343,50 @@ export default class DatePicker extends React.Component {
         </div>
       );
     }
+
+    // datepicker open from an secondary popup as per new design
+    if (isCompact && this.state.showCompactContainer)
+      return (
+        <>
+          <div className="react-datepicker__input-container init-input">
+            {this.renderDateInput()}
+          </div>
+          <div
+            className={`compact-container-parent main-containerpostion-${parentContainerPos}`}
+            ref={this.compactContainerRef}
+          >
+            <div className="compact-container ">
+              <PopperComponent
+                className={this.props.popperClassName}
+                wrapperClassName={this.props.wrapperClassName}
+                hidePopper={!this.isCalendarOpen()}
+                portalId={this.props.portalId}
+                popperModifiers={this.props.popperModifiers}
+                targetComponent={
+                  <div className="row">
+                    <div className="col-lg-6">
+                      <div className="react-datepicker__input-container default-input mb-2">
+                        <label className="date-time-label">{dateLabel}</label>
+                        {this.renderDefaultDateInput()}
+                      </div>
+                    </div>
+                    <div className="col-lg-6">
+                      {children}
+                      {this.renderClearButton()}
+                    </div>
+                  </div>
+                }
+                popperContainer={this.props.popperContainer}
+                popperComponent={calendar}
+                popperPlacement={this.props.popperPlacement}
+                popperProps={this.props.popperProps}
+                popperOnKeyDown={this.onPopperKeyDown}
+                enableTabLoop={this.props.enableTabLoop}
+              />
+            </div>
+          </div>
+        </>
+      );
 
     return (
       <PopperComponent

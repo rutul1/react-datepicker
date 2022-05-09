@@ -183,6 +183,13 @@ export default class Month extends React.Component {
           calendarStartDay={this.props.calendarStartDay}
           monthShowsDuplicateDaysEnd={this.props.monthShowsDuplicateDaysEnd}
           monthShowsDuplicateDaysStart={this.props.monthShowsDuplicateDaysStart}
+          selectedRangeWeek={
+            this.props.selectsRange &&
+            new Date(this.props.selected).getTime() >=
+              new Date(currentWeekStart).getTime() &&
+            new Date(this.props.selected).getTime() <=
+              utils.addDays(new Date(currentWeekStart), 6).getTime()
+          }
         />
       );
 

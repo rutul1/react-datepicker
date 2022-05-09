@@ -8,6 +8,8 @@ const Example = () => {
   const [isOpen, setIsOpen] = useState(true);
   const [startDate, setStartDate] = useState(new Date());
   const [isScrolled, setIsScrolled] = useState(true);
+  const [nativeErr, setNativeErr] = useState("");
+  const [activeId, setActiveId] = useState(null);
 
   useEffect(() => {
     document.addEventListener("scroll", handleScroll);
@@ -22,17 +24,49 @@ const Example = () => {
     }
   };
 
-  return (
-    <DatePicker
-      open={isOpen && isScrolled}
-      selected={startDate}
-      onChange={date => {
-        setStartDate(date);
-        setIsOpen(false);
-      }}
-      onInputClick={() => setIsOpen(true)}
-    />
-  );
+  return [1, 2, 3, 4, 5].map((itm) => (
+    <>
+      {nativeErr && <span style={{ color: "red" }}>Invalid date</span>}
+      <DatePicker
+        id={itm}
+        keepOpen={itm === activeId}
+        selected={startDate}
+        onChange={(date) => {
+          console.log({ output: date });
+          setStartDate(date);
+          // setIsOpen(false);
+        }}
+        onInputClick={() => {
+          console.log("input click external fun");
+          setActiveId(itm);
+        }}
+        // isOpenCalendar
+        mode={"compact"}
+        customInput={
+          <div
+            className="custom-input-val-container class2test"
+            onClick={(e) => console.log("hey this is cusomt ip")}
+          >
+            {startDate ? startDate.toString() : ""}
+          </div>
+        }
+        className={`norClass post-date-popup `}
+        handleNativeError={(err) => {
+          console.log({ err });
+          setNativeErr(err);
+        }}
+        // closeOnScroll={e=>console.log({e})}
+        // dateFormat={'MMM DD, YYYY'}
+        preventOpenOnFocus
+        dateFormat={"MMM dd"}
+        initialDateTime={new Date()}
+      >
+        <label className="date-time-label">Time</label>
+        <input />
+      </DatePicker>
+      <br />
+    </>
+  ));
 };
 
 const Root = () => (

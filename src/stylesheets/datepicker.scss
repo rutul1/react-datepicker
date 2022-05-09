@@ -647,6 +647,16 @@
   padding: 5px 0;
   clear: left;
 }
+.compact-container {
+  background-color: #fff;
+  padding: 16px;
+}
+.date-time-label {
+  color: black;
+}
+.custom-input-val-container {
+  color: black !important;
+}
 
 .react-datepicker__portal {
   position: fixed;
