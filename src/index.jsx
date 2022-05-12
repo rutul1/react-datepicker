@@ -856,7 +856,10 @@ export default class DatePicker extends React.Component {
         }
       } else {
         // DD-MMM-YYYY
-        if (input.value.length === 2 || input.value.length === 6) {
+        if (
+          (input.value.length === 2 || input.value.length === 6) &&
+          keyCode !== seperator
+        ) {
           input.value += seperator;
         }
       }
@@ -866,6 +869,12 @@ export default class DatePicker extends React.Component {
   onInputKeyDown = (event) => {
     this.props.onKeyDown(event);
     const eventKey = event.key;
+    if (eventKey === "Tab") {
+      this.setState({
+        open: false,
+      });
+      return;
+    }
 
     this.handleAutoDateFormatting(event.target, event.key, event);
 
