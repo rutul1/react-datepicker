@@ -284,6 +284,14 @@ export default class DatePicker extends React.Component {
   componentDidMount() {
     window.addEventListener("scroll", this.onScroll, true);
     document.addEventListener("click", this.handleClicks);
+
+    window.addEventListener("message", (e) => {
+      const { type, data } = e.data;
+
+      if (type === "react-datepicker-close") {
+        this.popupClose();
+      }
+    });
   }
 
   componentDidUpdate(prevProps, prevState) {
@@ -358,10 +366,14 @@ export default class DatePicker extends React.Component {
       !e.target.classList.contains("text-grey") &&
       !e.target.classList.contains("time-selection-ul__list")
     ) {
-      this.setState({ showCompactContainer: false, open: false });
-      const { initialDateTime } = this.props;
-      if (initialDateTime) this.props.onChange(initialDateTime);
+      this.popupClose();
     }
+  };
+
+  popupClose = () => {
+    this.setState({ showCompactContainer: false, open: false });
+    const { initialDateTime } = this.props;
+    if (initialDateTime) this.props.onChange(initialDateTime);
   };
 
   getPreSelection = () =>
@@ -422,9 +434,12 @@ export default class DatePicker extends React.Component {
   };
 
   handleCompactContainer = (val) => {
-    this.setState({
-      showCompactContainer: true,
-    });
+    window.top.postMessage({ type: "react-datepicker-close" }, "*");
+    setTimeout(() => {
+      this.setState({
+        showCompactContainer: true,
+      });
+    }, 0);
   };
 
   setOpen = (open, skipSetBlur = false) => {
@@ -983,7 +998,9 @@ export default class DatePicker extends React.Component {
         return;
       }
       event.preventDefault();
-      this.setState({ lastPreSelectChange: PRESELECT_CHANGE_VIA_NAVIGATE });
+      this.setState({
+        lastPreSelectChange: PRESELECT_CHANGE_VIA_NAVIGATE,
+      });
       if (this.props.adjustDateOnChange) {
         this.setSelected(newSelection);
       }
@@ -1329,6 +1346,7 @@ export default class DatePicker extends React.Component {
   };
 
   render() {
+    console.log(this.state.showCompactContainer, "render");
     const calendar = this.renderCalendar();
     const { mode, children, dateLabel } = this.props;
     const { parentContainerPos } = this.state;
